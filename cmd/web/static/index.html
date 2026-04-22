@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Rei Julian - Rastreamento</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  // Coordenada inicial (Praça Coronel Pedro Osório)
+  const initialLat = -31.770687426923516;
+  const initialLng = -52.34135057529372;
+
+  // Cria mapa
+  const map = L.map('map').setView([initialLat, initialLng], 17);
+
+  // Camada base (OpenStreetMap)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // Marcador inicial
+  const marker = L.marker([initialLat, initialLng]).addTo(map);
+
+  // Conexão SSE com backend
+  const source = new EventSource("/stream");
+
+  source.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+
+    const lat = data.latitude;
+    const lng = data.longitude;
+
+    // Move marcador
+    marker.setLatLng([lat, lng]);
+
+    // Centraliza o mapa
+    map.panTo([lat, lng]);
+
+    console.log("Atualizado:", data);
+  };
+
+  source.onerror = function(err) {
+    console.error("Erro SSE:", err);
+  };
+</script>
+
+</body>
+</html>
