@@ -2,73 +2,69 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Rei Julian - Rastreamento</title>
+  <title>Mapa Pokémon</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-    }
-
-    #map {
-      width: 100%;
-      height: 100%;
-    }
+    html, body { margin: 0; height: 100%; }
+    #map { width: 100%; height: 100%; }
   </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // Coordenada inicial (Praça Coronel Pedro Osório)
-  const initialLat = -31.770687426923516;
-  const initialLng = -52.34135057529372;
+const initialLat = -31.770687426923516;
+const initialLng = -52.34135057529372;
 
-  // Cria mapa
-  const map = L.map('map').setView([initialLat, initialLng], 17);
+const map = L.map('map').setView([initialLat, initialLng], 17);
 
-  // Camada base (OpenStreetMap)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19
-  }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
 
-  // Marcador inicial
-  const marker = L.marker([initialLat, initialLng]).addTo(map);
+// ===== ÍCONES =====
+const icons = {
+  player: L.icon({ iconUrl: "/static/player.png", iconSize: [32, 32] }),
+  pokemon: L.icon({ iconUrl: "/static/pokemon.png", iconSize: [32, 32] }),
+  pokestop: L.icon({ iconUrl: "/static/pokestop.png", iconSize: [32, 32] })
+};
 
-  // Conexão SSE com backend
-  const source = new EventSource("/stream");
+const typeMap = ["player", "pokemon", "pokestop"];
 
-  source.onmessage = function(event) {
-    const data = JSON.parse(event.data);
+const markers = new Map();
 
-    const lat = data.latitude;
-    const lng = data.longitude;
+// ===== SSE =====
+const source = new EventSource("/stream");
 
-    // Move marcador
-    marker.setLatLng([lat, lng]);
+source.onmessage = function(event) {
+  console.log(event.data);
+  const entities = JSON.parse(event.data);
 
-    // Centraliza o mapa
-    map.panTo([lat, lng]);
+  entities.forEach(e => {
+    const id = e.id;
+    const lat = e.pos.latitude;
+    const lng = e.pos.longitude;
 
-    console.log("Atualizado:", data);
-  };
+    let marker = markers.get(id);
 
-  source.onerror = function(err) {
-    console.error("Erro SSE:", err);
-  };
+    const icon = icons[typeMap[e.type]];
+
+    if (!marker) {
+      marker = L.marker([lat, lng], { icon }).addTo(map);
+      markers.set(id, marker);
+    } else {
+      marker.setLatLng([lat, lng]);
+    }
+  });
+};
 </script>
 
 </body>
