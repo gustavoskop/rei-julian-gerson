@@ -401,7 +401,7 @@ func (w *World) handleInteractions(rng *rand.Rand) {
 				target.Pos.Longitude,
 			)
 
-			if dist > 20.0 { //se estiver a menos de 20 metros de um pokémon ou pokestop, faz uma ação
+			if dist > 25.0 { //se estiver a menos de 25 metros de um pokémon ou pokestop, faz uma ação
 				continue
 			}
 
@@ -409,9 +409,9 @@ func (w *World) handleInteractions(rng *rand.Rand) {
 
 			case Pokemon:
 
-				chance := 0.4// 40% de chance de capturar um pokemon
+				chance := 0.5// 50% de chance de capturar um pokemon
 				if player.CaptureBoost {
-					chance = 0.7 //se passou por um pokestop antes, chance aumenta para 70%
+					chance = 0.8 //se passou por um pokestop antes, chance aumenta para 80%
 					player.CaptureBoost = false
 				}
 

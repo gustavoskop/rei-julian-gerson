@@ -33,9 +33,9 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map
 
 
 const icons = {
-  player: L.icon({ iconUrl: "/static//Player.png", iconSize: [24, 24] }),
-  pokestop_active: L.icon({ iconUrl: "/static/Pokestop.png", iconSize: [24, 24] }),
-  pokestop_inactive: L.icon({ iconUrl: "/static/Pokestop_off.png", iconSize: [24, 24] })
+  player: L.icon({ iconUrl: "/static//Player.png", iconSize: [26, 26] }),
+  pokestop_active: L.icon({ iconUrl: "/static/Pokestop.png", iconSize: [26, 26] }),
+  pokestop_inactive: L.icon({ iconUrl: "/static/Pokestop_off.png", iconSize: [26, 26] })
 };
 
 const typeMap = ["player", "pokemon", "pokestop"];
@@ -97,7 +97,7 @@ source.onmessage = function(event) {
       console.log(e.pokemon_type)
       icon = L.icon({
         iconUrl: sprite,
-        iconSize: [24, 24]
+        iconSize: [29, 29]
       });
     }
 
