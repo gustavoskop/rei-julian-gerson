@@ -106,6 +106,7 @@ type World struct {
 	nextID int
 }
 
+//cria maps para entidades e os clients para o frontend
 func NewWorld() *World {
 	return &World{
 		entities: make(map[string]*Entity),
@@ -113,6 +114,7 @@ func NewWorld() *World {
 	}
 }
 
+//funções para escolher o spawn baseado nos pesos de centers
 func chooseCenter(rng *rand.Rand) Center {
 	r := rng.Float64()
 	sum := 0.0
@@ -149,7 +151,7 @@ func multiCenterPosition(rng *rand.Rand) (float64, float64) {
 	return lat, lon
 }
 
-
+// os spawns são parecidos, escolhem o spawn baseado nos pesos do vetor centers e atribuem seus respectivos campos
 func (w *World) SpawnPokemons(n int) {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -166,11 +168,13 @@ func (w *World) SpawnPokemons(n int) {
 				Timestamp: time.Now(),
 				Step: 10,
 			},
+
+			//proíbe de sair de perto do spawn
 			OriginLat: lat,
 			OriginLon: lon,
 			MaxRadius: 30,
 
-			PokemonType: rng.Intn(numPokemonTypes),
+			PokemonType: rng.Intn(numPokemonTypes), //escolhe o tipo do pokemon
 			Active: true,
 			
 		}
@@ -212,7 +216,7 @@ func (w *World) SpawnPokeStops(n int) {
 				Latitude:  lat,
 				Longitude: lon,
 				Timestamp: time.Now(),
-				Step: 0,
+				Step: 0, // não se move
 			},
 			Active: true,
 			PokestopAvailable: true,
@@ -220,6 +224,7 @@ func (w *World) SpawnPokeStops(n int) {
 	}
 }
 
+// a cada "tick", tem 80% de chance de spawnar 2 pokemons novos
 func (w *World) spawnRandomPokemon(rng *rand.Rand) {
 
 	if rng.Float64() > 0.8 {
@@ -249,17 +254,17 @@ func (w *World) spawnRandomPokemon(rng *rand.Rand) {
 }
 
 
-
+// loop principal
 func (w *World) StartSimulation() {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	
 
 	for {
-		time.Sleep(3 * time.Second)
+		time.Sleep(3 * time.Second) // tick de 3 segundos
 
 		now := time.Now()
 		
-		w.mu.Lock()
+		w.mu.Lock() // lock para as goroutines não executarem esse campo ao mesmo tempo
 
 		for _, e := range w.entities {
 
@@ -267,7 +272,7 @@ func (w *World) StartSimulation() {
 			
 			case Pokestop:
 				if !e.PokestopAvailable{
-					if now.After(e.CooldownUntil) {
+					if now.After(e.CooldownUntil) { // caso o pokestop já tenha sido usado e o cooldown acabou, ele volta a ficar disponível
 						e.PokestopAvailable = true
 						log.Printf("Pokestop %s reativado", e.ID)
 					}
@@ -278,7 +283,7 @@ func (w *World) StartSimulation() {
 			
 			case Player:
 			
-				bearing := rng.Float64() * 2 * math.Pi
+				bearing := rng.Float64() * 2 * math.Pi //direção aleatória
 
 				newLat, newLon := movePoint(
 					e.Pos.Latitude,
@@ -287,43 +292,44 @@ func (w *World) StartSimulation() {
 					bearing,
 				)
 
-				if newLat > north || newLat < south || newLon > east || newLon < west {
+				if newLat > north || newLat < south || newLon > east || newLon < west { //limite da cidade
 					continue
 				}
 
 				e.Pos.Latitude = newLat
 				e.Pos.Longitude = newLon
 				e.Pos.Timestamp = time.Now()
-				e.Path = append(e.Path, e.Pos)
+				e.Path = append(e.Path, e.Pos) //vetor path para mandar pro banco de dados depois
 		}
 		}
 
-		w.handleInteractions(rng)
+		w.handleInteractions(rng) //verifica para todos os jogadores se pode interagir com pokestop ou pokemon
 		w.spawnRandomPokemon(rng)
 
-		snapshot := make([]Entity, 0, len(w.entities))
+		snapshot := make([]Entity, 0, len(w.entities)) //copia o estado atual das entidades
 		for _, e := range w.entities {
 			if e.Active{
 				snapshot = append(snapshot, *e)
 			}
 		}
 
-		clients := make([]chan []Entity, 0, len(w.clients))
+		clients := make([]chan []Entity, 0, len(w.clients)) //copia lista de clientes
 		for ch := range w.clients {
 			clients = append(clients, ch)
 		}
 
-		w.mu.Unlock()
+		w.mu.Unlock() //desbloqueia a região crítica
 
-		for _, ch := range clients {
+		for _, ch := range clients { //atualiza os canais
 			select {
-			case ch <- snapshot:
+			case ch <- snapshot: //ignora canais que não estão prontos
 			default:
 			}
 		}
 	}
 }
 
+//função para mover pokemon verificando se vai sair de perto do spawn
 func movePokemon(e Entity) Entity {
 	bearing := rand.Float64() * 2 * math.Pi
 
@@ -342,7 +348,7 @@ func movePokemon(e Entity) Entity {
 	)
 
 	
-	if dist > e.MaxRadius {
+	if dist > e.MaxRadius { //se está muito longe do spawn, cancela o movimento
 		return e
 	}
 
@@ -352,6 +358,7 @@ func movePokemon(e Entity) Entity {
 	return e
 }
 
+//calcula distância do ponto X até o ponto Y
 func distanceMeters(lat1, lon1, lat2, lon2 float64) float64 {
 	const R = 6371000.0
 
@@ -367,6 +374,7 @@ func distanceMeters(lat1, lon1, lat2, lon2 float64) float64 {
 	return R * c
 }
 
+// lida com as interações do jogador, tanto com pokémons quanto com pokestops
 func (w *World) handleInteractions(rng *rand.Rand) {
 	for _, player := range w.entities {
 		interacted := false
@@ -377,7 +385,7 @@ func (w *World) handleInteractions(rng *rand.Rand) {
 
 		for _, target := range w.entities {
 
-			if interacted {
+			if interacted { //se já interagiu com algo neste tick, continua
 				break
 			}
 
@@ -393,7 +401,7 @@ func (w *World) handleInteractions(rng *rand.Rand) {
 				target.Pos.Longitude,
 			)
 
-			if dist > 20.0 {
+			if dist > 20.0 { //se estiver a menos de 20 metros de um pokémon ou pokestop, faz uma ação
 				continue
 			}
 
@@ -401,18 +409,18 @@ func (w *World) handleInteractions(rng *rand.Rand) {
 
 			case Pokemon:
 
-				chance := 0.4
+				chance := 0.4// 40% de chance de capturar um pokemon
 				if player.CaptureBoost {
-					chance = 0.7
+					chance = 0.7 //se passou por um pokestop antes, chance aumenta para 70%
 					player.CaptureBoost = false
 				}
 
 				if rng.Float64() < chance {
-					player.Pos.Latitude = target.Pos.Latitude
+					player.Pos.Latitude = target.Pos.Latitude //se capturou, vai até a posição do pokemon
 					player.Pos.Longitude = target.Pos.Longitude
 					player.Pokedex = append(player.Pokedex, target.ID)
 					player.CapturedCount++
-					target.Active = false
+					target.Active = false //desativa o pokemon
 
 					log.Printf("Player %s capturou %s", player.ID, target.ID)
 					interacted = true
@@ -420,7 +428,7 @@ func (w *World) handleInteractions(rng *rand.Rand) {
 
 			case Pokestop:
 
-				if !target.PokestopAvailable {
+				if !target.PokestopAvailable { //se pokestop está disponível
 					continue
 				}
 
@@ -429,7 +437,7 @@ func (w *World) handleInteractions(rng *rand.Rand) {
 
 				player.CaptureBoost = true
 				target.PokestopAvailable = false
-				target.CooldownUntil = time.Now().Add(1 * time.Minute)
+				target.CooldownUntil = time.Now().Add(1 * time.Minute) // entra em cooldown de 1 minuto
 				log.Printf("Player %s usou Pokestop %s", player.ID, target.ID)
 				player.PokestopCount++
 				interacted = true
@@ -439,7 +447,7 @@ func (w *World) handleInteractions(rng *rand.Rand) {
 	}
 }
 
-
+// funções matemáticas
 func movePoint(latDeg, lonDeg, distanceMeters, bearingRad float64) (float64, float64) {
 	lat1 := degreesToRadians(latDeg)
 	lon1 := degreesToRadians(lonDeg)
@@ -477,7 +485,7 @@ func normalizeLongitude(lon float64) float64 {
 }
 
 
-
+//atualiza o frontend
 func (w *World) SSEHandler(wr http.ResponseWriter, r *http.Request) {
 	flusher, ok := wr.(http.Flusher)
 	if !ok {
@@ -505,8 +513,8 @@ func (w *World) SSEHandler(wr http.ResponseWriter, r *http.Request) {
 
 	for {
 		select {
-		case data := <-ch:
-			payload, _ := json.Marshal(data)
+		case data := <-ch://recebe dado
+			payload, _ := json.Marshal(data) //convetre pra json
 			fmt.Fprintf(wr, "data: %s\n\n", payload)
 			flusher.Flush()
 
@@ -516,16 +524,17 @@ func (w *World) SSEHandler(wr http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
+//cria as tabelas do banco de dados
 func initDB() *sql.DB {
-	os.Remove("tracker.db")
+	os.Remove("tracker.db") //deleta o bd antigo
 
 	db, err := sql.Open("sqlite3", "tracker.db")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	query := `
+	//tabela de posições
+	query := ` 
 	CREATE TABLE IF NOT EXISTS positions (
 	player_id TEXT,
 	lat REAL,
@@ -539,6 +548,7 @@ func initDB() *sql.DB {
 		log.Fatal(err)
 	}
 
+	//tabela de players
 	query2 := `
 	CREATE TABLE IF NOT EXISTS players (
 		id TEXT PRIMARY KEY,
@@ -555,6 +565,8 @@ func initDB() *sql.DB {
 	return db
 }
 
+
+//atualiza as tabelas
 func (w *World) savePlayers(db *sql.DB) {
 	w.mu.Lock()
 
@@ -605,6 +617,7 @@ func (w *World) savePlayers(db *sql.DB) {
 			}
 		}
 
+		//reseta os vetores para não desperdiçar memória
 		e.Path = nil
 		e.CapturedCount = 0
 		e.PokestopCount = 0
@@ -617,17 +630,19 @@ func (w *World) savePlayers(db *sql.DB) {
 }
 
 func main() {
-	world := NewWorld()
+	world := NewWorld() //cria entidades e canais
 
+	//spawna entidades
 	world.SpawnPokemons(1000)
 	world.SpawnPlayers(300)
 	world.SpawnPokeStops(150)
 
+	//simulação
 	go world.StartSimulation()
 	db := initDB()
 	go func() {
 		for {
-			time.Sleep(1 * time.Minute)
+			time.Sleep(1 * time.Minute) // a cada minuto, salva no bd
 			world.savePlayers(db)
 			log.Println("Salvou posições no banco")
 		}

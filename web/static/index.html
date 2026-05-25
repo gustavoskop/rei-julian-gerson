@@ -92,7 +92,7 @@ source.onmessage = function(event) {
 
     let marker = markers.get(id);
 
-    if (e.type === 1) { 
+    if (e.type === 1) { //se for pokemon, verifica qual sprite pegar
       const sprite = pokemonSprites[e.pokemon_type];
       console.log(e.pokemon_type)
       icon = L.icon({
@@ -101,7 +101,7 @@ source.onmessage = function(event) {
       });
     }
 
-    else if (e.type === 2) { 
+    else if (e.type === 2) { //se for pokestop, verifica se está disponível ou não
       icon = e.PokestopAvailable
         ? icons.pokestop_active
         : icons.pokestop_inactive;
@@ -118,7 +118,7 @@ source.onmessage = function(event) {
     }
   });
 
-  markers.forEach((marker, id) => {
+  markers.forEach((marker, id) => { //se o pokemon estiver inativo, é porque foi capturado
     if (!activeIds.has(id)) {
       map.removeLayer(marker);
       markers.delete(id);
