@@ -26,42 +26,102 @@ const initialLng = -52.34135057529372;
 
 const map = L.map('map').setView([initialLat, initialLng], 17);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
   maxZoom: 19
 }).addTo(map);
 
-// ===== ÍCONES =====
+
 const icons = {
-  player: L.icon({ iconUrl: "/static/player.png", iconSize: [32, 32] }),
-  pokemon: L.icon({ iconUrl: "/static/pokemon.png", iconSize: [32, 32] }),
-  pokestop: L.icon({ iconUrl: "/static/pokestop.png", iconSize: [32, 32] })
+  player: L.icon({ iconUrl: "/static//Player.png", iconSize: [24, 24] }),
+  pokestop_active: L.icon({ iconUrl: "/static/Pokestop.png", iconSize: [24, 24] }),
+  pokestop_inactive: L.icon({ iconUrl: "/static/Pokestop_off.png", iconSize: [24, 24] })
 };
 
 const typeMap = ["player", "pokemon", "pokestop"];
 
+const pokemonSprites = [
+  "/static/pokemons/p0.png",
+  "/static/pokemons/p01.png",
+  "/static/pokemons/p02.png",
+  "/static/pokemons/p03.png",
+  "/static/pokemons/p04.png",
+  "/static/pokemons/p05.png",
+  "/static/pokemons/p06.png",
+  "/static/pokemons/p07.png",
+  "/static/pokemons/p08.png",
+  "/static/pokemons/p09.png",
+  "/static/pokemons/p10.png",
+  "/static/pokemons/p11.png",
+  "/static/pokemons/p12.png",
+  "/static/pokemons/p13.png",
+  "/static/pokemons/p14.png",
+  "/static/pokemons/p15.png",
+  "/static/pokemons/p16.png",
+  "/static/pokemons/p17.png",
+  "/static/pokemons/p18.png",
+  "/static/pokemons/p19.png",
+  "/static/pokemons/p20.png",
+  "/static/pokemons/p21.png",
+  "/static/pokemons/p22.png",
+  "/static/pokemons/p23.png",
+  "/static/pokemons/p24.png",
+  "/static/pokemons/p25.png",
+  "/static/pokemons/p26.png",
+  "/static/pokemons/p27.png",
+  "/static/pokemons/p28.png",
+  "/static/pokemons/p29.png",
+  "/static/pokemons/p30.png",
+];
+
 const markers = new Map();
 
-// ===== SSE =====
+
 const source = new EventSource("/stream");
 
 source.onmessage = function(event) {
-  console.log(event.data);
   const entities = JSON.parse(event.data);
+  const activeIds = new Set();
 
   entities.forEach(e => {
     const id = e.id;
     const lat = e.pos.latitude;
     const lng = e.pos.longitude;
 
+    activeIds.add(id);
+
     let marker = markers.get(id);
 
-    const icon = icons[typeMap[e.type]];
+    if (e.type === 1) { 
+      const sprite = pokemonSprites[e.pokemon_type];
+      console.log(e.pokemon_type)
+      icon = L.icon({
+        iconUrl: sprite,
+        iconSize: [24, 24]
+      });
+    }
+
+    else if (e.type === 2) { 
+      icon = e.PokestopAvailable
+        ? icons.pokestop_active
+        : icons.pokestop_inactive;
+    } else {
+      icon = icons[typeMap[e.type]];
+    }
 
     if (!marker) {
       marker = L.marker([lat, lng], { icon }).addTo(map);
       markers.set(id, marker);
     } else {
       marker.setLatLng([lat, lng]);
+      marker.setIcon(icon);
+    }
+  });
+
+  markers.forEach((marker, id) => {
+    if (!activeIds.has(id)) {
+      map.removeLayer(marker);
+      markers.delete(id);
     }
   });
 };
