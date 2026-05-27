@@ -80,34 +80,44 @@ const markers = new Map();
 const source = new EventSource("/stream");
 
 source.onmessage = function(event) {
-  const entities = JSON.parse(event.data);
-  const activeIds = new Set();
+  const data = JSON.parse(event.data);
 
-  entities.forEach(e => {
-    const id = e.id;
-    const lat = e.pos.latitude;
-    const lng = e.pos.longitude;
+  const activeIds = new Set();
+  
+  data.players.forEach(p => {
+    const id = p.id;
+    const lat = p.pos.latitude;
+    const lng = p.pos.longitude;
 
     activeIds.add(id);
 
     let marker = markers.get(id);
 
-    if (e.type === 1) { //se for pokemon, verifica qual sprite pegar
-      const sprite = pokemonSprites[e.pokemon_type];
-      console.log(e.pokemon_type)
-      icon = L.icon({
-        iconUrl: sprite,
-        iconSize: [29, 29]
-      });
-    }
+    const icon = icons.player;
 
-    else if (e.type === 2) { //se for pokestop, verifica se está disponível ou não
-      icon = e.PokestopAvailable
-        ? icons.pokestop_active
-        : icons.pokestop_inactive;
+    if (!marker) {
+      marker = L.marker([lat, lng], { icon }).addTo(map);
+      markers.set(id, marker);
     } else {
-      icon = icons[typeMap[e.type]];
+      marker.setLatLng([lat, lng]);
     }
+  });
+
+  data.pokemons.forEach(p => {
+    const id = p.id;
+    const lat = p.pos.latitude;
+    const lng = p.pos.longitude;
+
+    activeIds.add(id);
+
+    let marker = markers.get(id);
+
+    const sprite = pokemonSprites[p.pokemon_type];
+
+    const icon = L.icon({
+      iconUrl: sprite,
+      iconSize: [29, 29]
+    });
 
     if (!marker) {
       marker = L.marker([lat, lng], { icon }).addTo(map);
@@ -118,7 +128,29 @@ source.onmessage = function(event) {
     }
   });
 
-  markers.forEach((marker, id) => { //se o pokemon estiver inativo, é porque foi capturado
+  data.pokestops.forEach(ps => {
+    const id = ps.id;
+    const lat = ps.pos.latitude;
+    const lng = ps.pos.longitude;
+
+    activeIds.add(id);
+
+    let marker = markers.get(id);
+
+    const icon = ps.pokestop_available
+      ? icons.pokestop_active
+      : icons.pokestop_inactive;
+
+    if (!marker) {
+      marker = L.marker([lat, lng], { icon }).addTo(map);
+      markers.set(id, marker);
+    } else {
+      marker.setLatLng([lat, lng]);
+      marker.setIcon(icon);
+    }
+  });
+
+  markers.forEach((marker, id) => {
     if (!activeIds.has(id)) {
       map.removeLayer(marker);
       markers.delete(id);
