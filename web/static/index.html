@@ -21,143 +21,165 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-const initialLat = -31.770687426923516;
-const initialLng = -52.34135057529372;
-
-const map = L.map('map').setView([initialLat, initialLng], 17);
-
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-  attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
-  maxZoom: 19
-}).addTo(map);
-
-
-const icons = {
-  player: L.icon({ iconUrl: "/static//Player.png", iconSize: [26, 26] }),
-  pokestop_active: L.icon({ iconUrl: "/static/Pokestop.png", iconSize: [26, 26] }),
-  pokestop_inactive: L.icon({ iconUrl: "/static/Pokestop_off.png", iconSize: [26, 26] })
-};
-
-const typeMap = ["player", "pokemon", "pokestop"];
-
-const pokemonSprites = [
-  "/static/pokemons/p0.png",
-  "/static/pokemons/p01.png",
-  "/static/pokemons/p02.png",
-  "/static/pokemons/p03.png",
-  "/static/pokemons/p04.png",
-  "/static/pokemons/p05.png",
-  "/static/pokemons/p06.png",
-  "/static/pokemons/p07.png",
-  "/static/pokemons/p08.png",
-  "/static/pokemons/p09.png",
-  "/static/pokemons/p10.png",
-  "/static/pokemons/p11.png",
-  "/static/pokemons/p12.png",
-  "/static/pokemons/p13.png",
-  "/static/pokemons/p14.png",
-  "/static/pokemons/p15.png",
-  "/static/pokemons/p16.png",
-  "/static/pokemons/p17.png",
-  "/static/pokemons/p18.png",
-  "/static/pokemons/p19.png",
-  "/static/pokemons/p20.png",
-  "/static/pokemons/p21.png",
-  "/static/pokemons/p22.png",
-  "/static/pokemons/p23.png",
-  "/static/pokemons/p24.png",
-  "/static/pokemons/p25.png",
-  "/static/pokemons/p26.png",
-  "/static/pokemons/p27.png",
-  "/static/pokemons/p28.png",
-  "/static/pokemons/p29.png",
-  "/static/pokemons/p30.png",
-];
-
-const markers = new Map();
-
-
-const source = new EventSource("/stream");
-
-source.onmessage = function(event) {
-  const data = JSON.parse(event.data);
-
-  const activeIds = new Set();
+  const initialLat = -31.770687426923516;
+  const initialLng = -52.34135057529372;
   
-  data.players.forEach(p => {
-    const id = p.id;
-    const lat = p.pos.latitude;
-    const lng = p.pos.longitude;
-
-    activeIds.add(id);
-
-    let marker = markers.get(id);
-
-    const icon = icons.player;
-
-    if (!marker) {
-      marker = L.marker([lat, lng], { icon }).addTo(map);
-      markers.set(id, marker);
-    } else {
-      marker.setLatLng([lat, lng]);
-    }
-  });
-
-  data.pokemons.forEach(p => {
-    const id = p.id;
-    const lat = p.pos.latitude;
-    const lng = p.pos.longitude;
-
-    activeIds.add(id);
-
-    let marker = markers.get(id);
-
-    const sprite = pokemonSprites[p.pokemon_type];
-
-    const icon = L.icon({
-      iconUrl: sprite,
-      iconSize: [29, 29]
+  const map = L.map('map').setView([initialLat, initialLng], 17);
+  
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19
+  }).addTo(map);
+  
+  // ===== ÍCONES =====
+  const icons = {
+    player: L.icon({ iconUrl: "/static/Player.png", iconSize: [20, 20] }),
+    pokestop_active: L.icon({ iconUrl: "/static/Pokestop.png", iconSize: [20, 20] }),
+    pokestop_inactive: L.icon({ iconUrl: "/static/Pokestop_off.png", iconSize: [20, 20] })
+  };
+  
+  const pokemonSprites = [
+    "/static/pokemons/p0.png",
+    "/static/pokemons/p01.png",
+    "/static/pokemons/p02.png",
+    "/static/pokemons/p03.png",
+    "/static/pokemons/p04.png",
+    "/static/pokemons/p05.png",
+    "/static/pokemons/p06.png",
+    "/static/pokemons/p07.png",
+    "/static/pokemons/p08.png",
+    "/static/pokemons/p09.png",
+    "/static/pokemons/p10.png",
+    "/static/pokemons/p11.png",
+    "/static/pokemons/p12.png",
+    "/static/pokemons/p13.png",
+    "/static/pokemons/p14.png",
+    "/static/pokemons/p15.png",
+    "/static/pokemons/p16.png",
+    "/static/pokemons/p17.png",
+    "/static/pokemons/p18.png",
+    "/static/pokemons/p19.png",
+    "/static/pokemons/p20.png",
+    "/static/pokemons/p21.png",
+    "/static/pokemons/p22.png",
+    "/static/pokemons/p23.png",
+    "/static/pokemons/p24.png",
+    "/static/pokemons/p25.png",
+    "/static/pokemons/p26.png",
+    "/static/pokemons/p27.png",
+    "/static/pokemons/p28.png",
+    "/static/pokemons/p29.png",
+    "/static/pokemons/p30.png",
+  ];
+  
+  // ===== MARKERS COM ESTADO =====
+  const markers = new Map();
+  
+  /*
+  {
+    marker,
+    currentLat,
+    currentLng,
+    targetLat,
+    targetLng
+  }
+  */
+  
+  const SMOOTHING = 0.12;
+  
+  // 🔁 LOOP DE ANIMAÇÃO
+  function animate() {
+    markers.forEach(data => {
+      data.currentLat += (data.targetLat - data.currentLat) * SMOOTHING;
+      data.currentLng += (data.targetLng - data.currentLng) * SMOOTHING;
+  
+      data.marker.setLatLng([data.currentLat, data.currentLng]);
     });
-
-    if (!marker) {
-      marker = L.marker([lat, lng], { icon }).addTo(map);
-      markers.set(id, marker);
-    } else {
-      marker.setLatLng([lat, lng]);
-      marker.setIcon(icon);
+  
+    requestAnimationFrame(animate);
+  }
+  
+  animate();
+  
+  // ===== SSE =====
+  const source = new EventSource("/stream");
+  
+  source.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    const activeIds = new Set();
+  
+    function updateEntity(id, lat, lng, icon) {
+      activeIds.add(id);
+  
+      let dataMarker = markers.get(id);
+  
+      if (!dataMarker) {
+        const marker = L.marker([lat, lng], { icon }).addTo(map);
+  
+        markers.set(id, {
+          marker: marker,
+          currentLat: lat,
+          currentLng: lng,
+          targetLat: lat,
+          targetLng: lng
+        });
+  
+      } else {
+        dataMarker.targetLat = lat;
+        dataMarker.targetLng = lng;
+        dataMarker.marker.setIcon(icon);
+      }
     }
-  });
-
-  data.pokestops.forEach(ps => {
-    const id = ps.id;
-    const lat = ps.pos.latitude;
-    const lng = ps.pos.longitude;
-
-    activeIds.add(id);
-
-    let marker = markers.get(id);
-
-    const icon = ps.pokestop_available
-      ? icons.pokestop_active
-      : icons.pokestop_inactive;
-
-    if (!marker) {
-      marker = L.marker([lat, lng], { icon }).addTo(map);
-      markers.set(id, marker);
-    } else {
-      marker.setLatLng([lat, lng]);
-      marker.setIcon(icon);
-    }
-  });
-
-  markers.forEach((marker, id) => {
-    if (!activeIds.has(id)) {
-      map.removeLayer(marker);
-      markers.delete(id);
-    }
-  });
-};
-</script>
+  
+    // ===== PLAYERS =====
+    data.players.forEach(p => {
+      updateEntity(
+        p.id,
+        p.pos.latitude,
+        p.pos.longitude,
+        icons.player
+      );
+    });
+  
+    // ===== POKEMONS =====
+    data.pokemons.forEach(p => {
+      const sprite = pokemonSprites[p.pokemon_type];
+  
+      const icon = L.icon({
+        iconUrl: sprite,
+        iconSize: [20, 20]
+      });
+  
+      updateEntity(
+        p.id,
+        p.pos.latitude,
+        p.pos.longitude,
+        icon
+      );
+    });
+  
+    // ===== POKESTOPS =====
+    data.pokestops.forEach(ps => {
+      const icon = ps.pokestop_available
+        ? icons.pokestop_active
+        : icons.pokestop_inactive;
+  
+      updateEntity(
+        ps.id,
+        ps.pos.latitude,
+        ps.pos.longitude,
+        icon
+      );
+    });
+  
+    // 🧹 REMOVE INATIVOS
+    markers.forEach((dataMarker, id) => {
+      if (!activeIds.has(id)) {
+        map.removeLayer(dataMarker.marker);
+        markers.delete(id);
+      }
+    });
+  };
+  </script>
 
 </body>
 </html>
